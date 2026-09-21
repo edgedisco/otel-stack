@@ -1,6 +1,6 @@
 # OTel Stack 🔭
 
-A self-hosted OpenTelemetry observability stack for **general-purpose telemetry** (logs, traces, metrics) with pre-configured visualization in Grafana.
+A production-grade, self-hosted OpenTelemetry observability stack for **general-purpose telemetry** (logs, traces, metrics) with pre-configured visualization in Grafana.
 
 Unlike LLM-specific trace tooling (like Langfuse), this stack is designed to catch standard OTLP data from endpoint sensors, edge discovery tools (such as [EdgeDisco](../edgedisco)), and infrastructure services.
 
@@ -13,11 +13,14 @@ Unlike LLM-specific trace tooling (like Langfuse), this stack is designed to cat
                        │   Endpoint Sensors /    │
                        │   EdgeDisco Discovery   │
                        └────────────┬────────────┘
-                                    │ OTLP HTTP / gRPC
+                                    │ OTLP Logs (Protobuf / JSON)
                                     ▼
                        ┌─────────────────────────┐
                        │  OpenTelemetry Collector│
                        │  (Receivers, Processors)│
+                       │  • Memory Limiter       │
+                       │  • Transform (OTTL)     │
+                       │  • Batch                │
                        └─────┬──────┬──────┬─────┘
                              │      │      │
           OTLP Logs (/otlp)  │      │      │ Prometheus Scrape (:8889)
@@ -38,11 +41,11 @@ Unlike LLM-specific trace tooling (like Langfuse), this stack is designed to cat
 
 | Service | Image | Role | Port |
 |---|---|---|---|
-| **otel-collector** | `otel/opentelemetry-collector-contrib` | OTLP gateway (HTTP/gRPC), batching, routing | `4317` (gRPC), `4318` (HTTP), `8889` (metrics), `13133` (health) |
-| **loki** | `grafana/loki:3.0.0` | High-efficiency log store with native OTLP ingestion | `3100` |
+| **otel-collector** | `otel/opentelemetry-collector-contrib` | OTLP gateway (HTTP/gRPC), OTTL transform, batching, routing | `4317` (gRPC), `4318` (HTTP), `8889` (metrics), `13133` (health) |
+| **loki** | `grafana/loki:3.0.0` | High-efficiency log store with native OTLP ingestion & structured metadata | `3100` |
 | **tempo** | `grafana/tempo:2.4.1` | Distributed tracing backend | `3200` |
-| **prometheus** | `prom/prometheus:v2.51.0` | Metrics engine scraping collector performance | `9091` |
-| **grafana** | `grafana/grafana:10.2.2` | Visualization with pre-provisioned dashboards | `3001` |
+| **prometheus** | `prom/prometheus:v2.51.0` | Metrics engine scraping collector pipeline performance | `9091` |
+| **grafana** | `grafana/grafana:10.2.2` | Visualization with pre-provisioned datasources and dashboards | `3001` |
 
 > **Port Conflict Safety:** Grafana is mapped to `3001` to avoid colliding with Langfuse (`3000`), and Prometheus is mapped to `9091` to avoid colliding with MinIO (`9090`).
 
@@ -65,11 +68,11 @@ Run the included verification script:
 ```
 
 This script verifies:
-1. All containers are up and healthy.
+1. All 5 containers are up and healthy.
 2. Collector health probe returns `OK` (`:13133`).
-3. Loki, Tempo, Prometheus, and Grafana are ready.
-4. Emits synthetic EdgeDisco asset detection records.
-5. Confirms Loki successfully stored the log stream.
+3. Loki, Tempo, Prometheus, and Grafana readiness probes return `OK`.
+4. Emits synthetic EdgeDisco asset detection records in both binary Protobuf and JSON.
+5. Queries Loki to confirm structured metadata ingestion.
 
 ### 3. Open Grafana
 
@@ -80,19 +83,79 @@ Anonymous admin access is enabled by default. The **EdgeDisco AI Asset Discovery
 
 ---
 
-## Sending EdgeDisco Telemetry
+## EdgeDisco Integration Contract
 
-EdgeDisco's outbox projections target the standard OTLP logs endpoint:
+EdgeDisco's outbox projects asset discoveries using the OTLP Logs specification:
 
-- **Protocol:** HTTP POST
+- **Transport:** HTTP POST
 - **Endpoint:** `http://localhost:4318/v1/logs`
-- **Content-Type:** `application/x-protobuf` or `application/json`
+- **Content-Type:** `application/x-protobuf` (`ExportLogsServiceRequest`) or `application/json`
+- **Resource Attributes:**
+  - `service.name: "edgedisco"`
+  - `service.version: "0.5.0"`
+- **Scope:**
+  - `ai_asset_inventory.otlp_encoder (v0.5.0)`
+- **Record Header:**
+  - `event_name = "edgedisco.asset.observed"`
+  - `severity_number = 9` (INFO)
+  - `time_unix_nano` = observation timestamp
+- **Record Attributes:**
+  - `edgedisco.schema.version` (int `1`)
+  - `edgedisco.observation.id` (`sha256:<64 hex chars>`)
+  - `device.id` (`<32 hex chars>`)
+  - `asset.kind` (`"application"` | `"process"` | `"agent_runtime"`)
+  - `asset.name` (e.g. `"Claude Code"`, `"Hermes Agent"`, `"Ollama"`, `"CrewAI"`)
+  - `asset.vendor` (e.g. `"Anthropic"`, `"Nous Research"`, `"Ollama"`)
+  - `asset.running` (boolean `true` | `false`)
+  - `edgedisco.simulated` (boolean `true` | `false`)
+  - `asset.host_app` (optional, e.g. `"Direct/local"`, `"Cursor"`)
+  - `asset.relationship` (optional, e.g. `"local_process"`, `"spawned_by"`)
 
-### Test with the included script
+### Protobuf Empty-Body Transform
+
+EdgeDisco's native protobuf encoder leaves `record.body` empty, packaging all detection data into attributes. The collector's OTTL `transform` processor synthesizes a readable log body if `body` is empty:
+
+```yaml
+set(body, Concat(["edgedisco.asset.observed: ", attributes["asset.name"], " (", attributes["asset.vendor"], ") [kind=", attributes["asset.kind"], "]"], ""))
+where (body == nil or body == "") and attributes["asset.name"] != nil
+```
+
+All original attributes are preserved and stored in Loki 3.0 as **structured metadata**.
+
+---
+
+## LogQL Query Examples
+
+In Loki 3.0, resource attributes (like `service.name`) become stream labels (`service_name`), while log record attributes become structured metadata:
+
+```logql
+# All EdgeDisco events
+{service_name="edgedisco"}
+
+# Filter by asset name
+{service_name="edgedisco"} | asset_name = "Claude Code"
+
+# Filter by vendor and running status
+{service_name="edgedisco"} | asset_vendor = "Anthropic" | asset_running = "true"
+
+# Aggregate observation rate per asset
+sum by (asset_name) (rate({service_name="edgedisco"} [5m]))
+```
+
+---
+
+## Testing & Verification Scripts
+
+### Send test events
+
+The `scripts/send_test_log.py` utility can emit both native binary protobuf and JSON:
 
 ```bash
-./scripts/send_test_log.py --name "Claude Code" --vendor "Anthropic" --kind "agent_runtime"
-./scripts/send_test_log.py --name "Ollama" --vendor "Ollama" --kind "application"
+# Binary protobuf (default, matches EdgeDisco wire format exactly)
+./scripts/send_test_log.py --format proto --name "Claude Code" --vendor "Anthropic" --kind "agent_runtime"
+
+# Standard OTLP JSON
+./scripts/send_test_log.py --format json --name "Ollama" --vendor "Ollama" --kind "application"
 ```
 
 ### Tail incoming records in real time
@@ -107,7 +170,7 @@ docker compose logs -f otel-collector
 
 ## Configuration Files
 
-- `config/otel-collector-config.yaml`: Receivers (4317/4318), processors, Loki/Tempo/Prometheus exporters.
+- `config/otel-collector-config.yaml`: Receivers (4317/4318), memory limiter, OTTL transform processor, Loki/Tempo/Prometheus exporters.
 - `config/loki-config.yaml`: TSDB schema v13, filesystem storage, structured metadata enabled.
 - `config/tempo-config.yaml`: Local WAL and block storage.
 - `config/prometheus.yaml`: Scrapes collector pipeline telemetry on `:8889`.

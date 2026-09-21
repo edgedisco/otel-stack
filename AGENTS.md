@@ -14,7 +14,7 @@ Five services wired together on an internal Docker network with published host p
 
 | Service | Image | Purpose | Host Port |
 |---|---|---|---|
-| `otel-collector` | `otel/opentelemetry-collector-contrib` | OTLP pipeline: receives gRPC/HTTP, batches, exports | `4317` (gRPC), `4318` (HTTP), `8889` (metrics), `13133` (health) |
+| `otel-collector` | `otel/opentelemetry-collector-contrib` | OTLP pipeline: receives gRPC/HTTP, OTTL transform, batches, exports | `4317` (gRPC), `4318` (HTTP), `8889` (metrics), `13133` (health) |
 | `loki` | `grafana/loki:3.0.0` | Log store with native OTLP ingestion & structured metadata | `3100` |
 | `tempo` | `grafana/tempo:2.4.1` | Distributed trace backend | `3200` |
 | `prometheus` | `prom/prometheus:v2.51.0` | Metrics store, scrapes collector pipeline stats | `9091` (avoids 9090 MinIO conflict) |
@@ -23,9 +23,9 @@ Five services wired together on an internal Docker network with published host p
 ### Request Flow for EdgeDisco Sensors
 
 1. **Sensor / Outbox:** `edgedisco` projects AI asset discoveries (`POST /v1/logs` with `Content-Type: application/x-protobuf` or `application/json`).
-2. **Collector:** `otel-collector` receives on port `4318`, parses OTLP LogRecords, applies memory limiter & batching processors, and outputs detailed debug logs to stdout.
+2. **Collector:** `otel-collector` receives on port `4318`, parses OTLP LogRecords, applies memory limiter, runs OTTL transform to populate body from attributes if empty, batches records, and outputs detailed debug logs to stdout.
 3. **Storage:**
-   - Logs flow to Loki via `http://loki:3100/otlp` with full structured attributes (`asset.name`, `asset.vendor`, `device.id`, `asset.running`).
+   - Logs flow to Loki via `http://loki:3100/otlp` with full structured metadata (`asset_name`, `asset_vendor`, `device_id`, `asset_running`, etc.).
    - Traces flow to Tempo via `tempo:4317`.
    - Collector internal metrics are scraped by Prometheus from `:8889`.
 4. **Visualization:** Grafana automatically provisions Loki, Tempo, and Prometheus, opening with the **EdgeDisco AI Asset Discovery** dashboard on `http://localhost:3001`.
@@ -54,11 +54,12 @@ docker compose ps
 # Tail collector logs to observe sensor ingestion in real time
 docker compose logs -f otel-collector
 
-# Run full pipeline verification (health checks + sample test events + Loki query)
+# Run full pipeline verification (health checks + protobuf/json sample events + Loki query)
 ./scripts/verify_stack.sh
 
-# Emit a test EdgeDisco asset observation event
-./scripts/send_test_log.py --name "Claude Code" --vendor "Anthropic" --kind "agent_runtime"
+# Emit test EdgeDisco asset observation events
+./scripts/send_test_log.py --format proto --name "Claude Code" --vendor "Anthropic" --kind "agent_runtime"
+./scripts/send_test_log.py --format json --name "Ollama" --vendor "Ollama" --kind "application"
 
 # Stop stack, keeping data volumes
 docker compose down
@@ -70,16 +71,35 @@ docker compose down -v
 ## EdgeDisco Integration Contract
 
 EdgeDisco emits OTLP Logs to `/v1/logs`.
-- Resource: `service.name: edgedisco`
-- Scope: `ai_asset_inventory.otlp_encoder`
-- Attributes preserved in Loki:
-  - `edgedisco.schema.version` (int)
-  - `edgedisco.observation.id` (sha256 hex string)
-  - `device.id` (32-char hex string)
-  - `asset.kind` (`application` | `process` | `agent_runtime`)
+- Method: `POST`
+- Path: `/v1/logs`
+- Content-Type: `application/x-protobuf` (`ExportLogsServiceRequest`) or `application/json`
+- Resource: `service.name: "edgedisco"`, `service.version: "0.5.0"`
+- Scope: `ai_asset_inventory.otlp_encoder (v0.5.0)`
+- Record:
+  - `event_name = "edgedisco.asset.observed"`
+  - `severity_number = 9` (INFO)
+  - `time_unix_nano` = nanoseconds timestamp
+  - `body` = empty in native protobuf; synthesized by collector OTTL transform into `edgedisco.asset.observed: <name> (<vendor>) [kind=<kind>]`
+- Attributes preserved in Loki structured metadata:
+  - `edgedisco.schema.version` (int `1`)
+  - `edgedisco.observation.id` (`sha256:<64 hex chars>`)
+  - `device.id` (`<32 hex chars>`)
+  - `asset.kind` (`"application"` | `"process"` | `"agent_runtime"`)
   - `asset.name` (string)
   - `asset.vendor` (string)
   - `asset.running` (bool)
   - `edgedisco.simulated` (bool)
-  - `asset.host_app` (optional, e.g. `Cursor`, `Direct/local`)
-  - `asset.relationship` (optional, e.g. `spawned_by`, `local_process`)
+  - `asset.host_app` (optional, e.g. `"Cursor"`, `"Direct/local"`)
+  - `asset.relationship` (optional, e.g. `"spawned_by"`, `"local_process"`)
+
+### LogQL Query Syntax
+
+```logql
+# Stream selector (matches resource service.name)
+{service_name="edgedisco"}
+
+# Structured metadata pipeline filters (Loki 3.0)
+{service_name="edgedisco"} | asset_name = "Claude Code"
+{service_name="edgedisco"} | asset_vendor = "Anthropic" | asset_running = "true"
+```
