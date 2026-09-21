@@ -11,6 +11,13 @@ processors:
     check_interval: 1s
     limit_percentage: 75
     spike_limit_percentage: 20
+  transform:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # If EdgeDisco emits an asset event with empty body, construct a readable body for log viewers
+          - 'set(body, Concat(["edgedisco.asset.observed: ", attributes["asset.name"], " (", attributes["asset.vendor"], ") [kind=", attributes["asset.kind"], "]"], "")) where (body == nil or body == "") and attributes["asset.name"] != nil'
   batch:
     send_batch_size: 256
     timeout: 1s
@@ -46,7 +53,7 @@ service:
   pipelines:
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, transform, batch]
       exporters: [otlphttp/loki, debug]
     traces:
       receivers: [otlp]
