@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send a synthetic EdgeDisco OTLP asset observation event to the OTel Collector.
+"""Send a synthetic EdgeDisco OTLP event to the OTel Collector.
 
 Supports both binary protobuf (matching EdgeDisco's otlp_encoder.py exactly)
 and standard OTLP JSON.
@@ -28,7 +28,8 @@ except ImportError:
 
 
 EVENT_NAME = "edgedisco.asset.observed"
-SCHEMA_VERSION = 1
+DEVICE_EVENT_NAME = "edgedisco.device.inventory"
+SCHEMA_VERSION = 2
 SERVICE_NAME = "edgedisco"
 SERVICE_VERSION = "0.5.0"
 SCOPE_NAME = "ai_asset_inventory.otlp_encoder"
@@ -41,7 +42,7 @@ def make_proto_payload(asset_name: str, vendor: str, kind: str, running: bool, s
         raise RuntimeError("opentelemetry.proto is required for protobuf encoding")
 
     nanos = time.time_ns()
-    device_id = hashlib.md5(b"edgedisco-test-device").hexdigest()
+    device_id = hashlib.sha256(b"edgedisco-test-device").hexdigest()[:32]
     obs_id = "sha256:" + hashlib.sha256(uuid.uuid4().bytes).hexdigest()
 
     def kv(key: str, val):
@@ -75,6 +76,7 @@ def make_proto_payload(asset_name: str, vendor: str, kind: str, running: bool, s
         kv("asset.name", asset_name),
         kv("asset.relationship", relationship),
         kv("asset.running", running),
+        kv("asset.present", True),
         kv("asset.vendor", vendor),
         kv("device.id", device_id),
         kv("edgedisco.observation.id", obs_id),
@@ -88,7 +90,7 @@ def make_proto_payload(asset_name: str, vendor: str, kind: str, running: bool, s
 def make_json_payload(asset_name: str, vendor: str, kind: str, running: bool, simulated: bool,
                       host_app: str = "Direct/local", relationship: str = "local_process") -> bytes:
     nanos = str(time.time_ns())
-    device_id = hashlib.md5(b"edgedisco-test-device").hexdigest()
+    device_id = hashlib.sha256(b"edgedisco-test-device").hexdigest()[:32]
     obs_id = "sha256:" + hashlib.sha256(uuid.uuid4().bytes).hexdigest()
 
     payload = {
@@ -120,6 +122,7 @@ def make_json_payload(asset_name: str, vendor: str, kind: str, running: bool, si
                                     {"key": "asset.name", "value": {"stringValue": asset_name}},
                                     {"key": "asset.vendor", "value": {"stringValue": vendor}},
                                     {"key": "asset.running", "value": {"boolValue": running}},
+                                    {"key": "asset.present", "value": {"boolValue": True}},
                                     {"key": "edgedisco.simulated", "value": {"boolValue": simulated}},
                                     {"key": "asset.host_app", "value": {"stringValue": host_app}},
                                     {"key": "asset.relationship", "value": {"stringValue": relationship}}
@@ -134,6 +137,64 @@ def make_json_payload(asset_name: str, vendor: str, kind: str, running: bool, si
     return json.dumps(payload).encode("utf-8")
 
 
+def make_device_payload(fmt: str) -> bytes:
+    nanos = time.time_ns()
+    device_id = hashlib.sha256(b"edgedisco-test-device").hexdigest()[:32]
+    obs_id = "sha256:" + hashlib.sha256(uuid.uuid4().bytes).hexdigest()
+    if fmt == "proto":
+        if not HAS_PROTO or ExportLogsServiceRequest is None or KeyValue is None or AnyValue is None:
+            raise RuntimeError("opentelemetry.proto is required for protobuf encoding")
+        req = ExportLogsServiceRequest()
+        resource_logs = req.resource_logs.add()
+        resource_logs.resource.attributes.extend([
+            KeyValue(key="service.name", value=AnyValue(string_value=SERVICE_NAME)),
+            KeyValue(key="service.version", value=AnyValue(string_value=SERVICE_VERSION)),
+        ])
+        scope_logs = resource_logs.scope_logs.add()
+        scope_logs.scope.name = SCOPE_NAME
+        scope_logs.scope.version = SCOPE_VERSION
+        record = scope_logs.log_records.add()
+        record.time_unix_nano = nanos
+        record.observed_time_unix_nano = nanos
+        record.severity_number = 9
+        record.severity_text = "INFO"
+        record.event_name = DEVICE_EVENT_NAME
+        record.body.string_value = DEVICE_EVENT_NAME
+        record.attributes.extend([
+            KeyValue(key="device.id", value=AnyValue(string_value=device_id)),
+            KeyValue(key="edgedisco.observation.id", value=AnyValue(string_value=obs_id)),
+            KeyValue(key="edgedisco.schema.version", value=AnyValue(int_value=SCHEMA_VERSION)),
+            KeyValue(key="inventory.asset_count", value=AnyValue(int_value=1)),
+            KeyValue(key="inventory.simulated_asset_count", value=AnyValue(int_value=0)),
+        ])
+        return req.SerializeToString()
+    payload = {
+        "resourceLogs": [{
+            "resource": {"attributes": [
+                {"key": "service.name", "value": {"stringValue": SERVICE_NAME}},
+                {"key": "service.version", "value": {"stringValue": SERVICE_VERSION}},
+            ]},
+            "scopeLogs": [{
+                "scope": {"name": SCOPE_NAME, "version": SCOPE_VERSION},
+                "logRecords": [{
+                    "timeUnixNano": str(nanos), "observedTimeUnixNano": str(nanos),
+                    "severityNumber": 9, "severityText": "INFO",
+                    "eventName": DEVICE_EVENT_NAME,
+                    "body": {"stringValue": DEVICE_EVENT_NAME},
+                    "attributes": [
+                        {"key": "device.id", "value": {"stringValue": device_id}},
+                        {"key": "edgedisco.observation.id", "value": {"stringValue": obs_id}},
+                        {"key": "edgedisco.schema.version", "value": {"intValue": SCHEMA_VERSION}},
+                        {"key": "inventory.asset_count", "value": {"intValue": 1}},
+                        {"key": "inventory.simulated_asset_count", "value": {"intValue": 0}},
+                    ],
+                }],
+            }],
+        }],
+    }
+    return json.dumps(payload).encode("utf-8")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Send test EdgeDisco OTLP log to OTel Collector")
     parser.add_argument("--endpoint", default="http://localhost:4318/v1/logs", help="Collector OTLP logs endpoint")
@@ -143,13 +204,18 @@ def main():
     parser.add_argument("--running", action="store_true", default=True, help="Asset running flag")
     parser.add_argument("--simulated", action="store_true", default=False, help="Asset simulated flag")
     parser.add_argument("--format", choices=["auto", "proto", "json"], default="auto", help="Payload wire format")
+    parser.add_argument("--event", choices=["asset", "device"], default="asset",
+                        help="Emit an asset observation or device inventory heartbeat")
     args = parser.parse_args()
 
     fmt = args.format
     if fmt == "auto":
         fmt = "proto" if HAS_PROTO else "json"
 
-    if fmt == "proto":
+    if args.event == "device":
+        data = make_device_payload(fmt)
+        content_type = "application/x-protobuf" if fmt == "proto" else "application/json"
+    elif fmt == "proto":
         data = make_proto_payload(args.name, args.vendor, args.kind, args.running, args.simulated)
         content_type = "application/x-protobuf"
     else:

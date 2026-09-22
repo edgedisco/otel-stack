@@ -1,6 +1,6 @@
 # OTel Stack 🔭
 
-A production-grade, self-hosted OpenTelemetry observability stack for **general-purpose telemetry** (logs, traces, metrics) with pre-configured visualization in Grafana.
+A self-hosted OpenTelemetry observability stack for **local development and evaluation** of general-purpose telemetry (logs, traces, metrics) with pre-configured visualization in Grafana.
 
 Unlike LLM-specific trace tooling (like Langfuse), this stack is designed to catch standard OTLP data from endpoint sensors, edge discovery tools (such as [EdgeDisco](../edgedisco)), and infrastructure services.
 
@@ -81,7 +81,7 @@ Open your browser to:
 
 Anonymous admin access is enabled by default. The **EdgeDisco AI Asset Discovery** dashboard is loaded at root.
 
-Published ports bind to \`127.0.0.1\` by default. Set \`OTEL_STACK_BIND_ADDRESS\` explicitly if
+Published ports bind to `127.0.0.1` by default. Set `OTEL_STACK_BIND_ADDRESS` explicitly if
 you are placing authenticated TLS ingress in front of the stack for remote access.
 
 ---
@@ -111,13 +111,14 @@ EdgeDisco's outbox projects asset discoveries using the OTLP Logs specification:
   - `asset.vendor` (e.g. `"Anthropic"`, `"Nous Research"`, `"Ollama"`)
   - `asset.running` (boolean `true` | `false`)
   - `asset.present` (boolean; presence is independent from running state)
+  - `inventory.asset_count` and `inventory.simulated_asset_count` for device heartbeat records
   - `edgedisco.simulated` (boolean `true` | `false`)
   - `asset.host_app` (optional, e.g. `"Direct/local"`, `"Cursor"`)
   - `asset.relationship` (optional, e.g. `"local_process"`, `"spawned_by"`)
 
 ### Protobuf Empty-Body Transform
 
-EdgeDisco's native protobuf encoder leaves `record.body` empty, packaging all detection data into attributes. The collector's OTTL `transform` processor synthesizes a readable log body if `body` is empty:
+EdgeDisco asset records leave `record.body` empty, packaging detection data into attributes. Device heartbeat records carry the fixed body `edgedisco.device.inventory`. The collector's OTTL `transform` processor synthesizes a readable body only for asset records:
 
 ```yaml
 set(body, Concat(["edgedisco.asset.observed: ", attributes["asset.name"], " (", attributes["asset.vendor"], ") [kind=", attributes["asset.kind"], "]"], ""))
@@ -134,20 +135,24 @@ In Loki 3.0, resource attributes (like `service.name`) become stream labels (`se
 
 ```logql
 # Asset state changes
-{service_name="edgedisco", event_name="edgedisco.asset.observed"}
+{service_name="edgedisco"} | asset_name != ""
 
 # Device inventory heartbeats
-{service_name="edgedisco", event_name="edgedisco.device.inventory"}
+{service_name="edgedisco"} | inventory_asset_count != ""
 
 # Filter by asset name
-{service_name="edgedisco", event_name="edgedisco.asset.observed"} | asset_name = "Claude Code"
+{service_name="edgedisco"} | asset_name = "Claude Code"
 
 # Filter by vendor, presence, and running status
-{service_name="edgedisco", event_name="edgedisco.asset.observed"} | asset_vendor = "Anthropic" | asset_present = "true" | asset_running = "true"
+{service_name="edgedisco"} | asset_vendor = "Anthropic" | asset_present = "true" | asset_running = "true"
 
 # Aggregate observation rate per asset
-sum by (asset_name) (rate({service_name="edgedisco", event_name="edgedisco.asset.observed"} [5m]))
+sum by (asset_name) (rate({service_name="edgedisco"} | asset_name != "" [5m]))
 ```
+
+The OTLP `event_name` header remains part of the log record but is not emitted as a Loki stream
+label by this collector/Loki configuration. The type-specific attribute filters above are the
+portable way to distinguish asset records from device heartbeats.
 
 ---
 
@@ -158,8 +163,11 @@ sum by (asset_name) (rate({service_name="edgedisco", event_name="edgedisco.asset
 The `scripts/send_test_log.py` utility can emit both native binary protobuf and JSON:
 
 ```bash
-# Binary protobuf (default, matches EdgeDisco wire format exactly)
+# Binary protobuf asset state change (matches EdgeDisco wire format)
 ./scripts/send_test_log.py --format proto --name "Claude Code" --vendor "Anthropic" --kind "agent_runtime"
+
+# Binary protobuf device inventory heartbeat
+./scripts/send_test_log.py --format proto --event device
 
 # Standard OTLP JSON
 ./scripts/send_test_log.py --format json --name "Ollama" --vendor "Ollama" --kind "application"
