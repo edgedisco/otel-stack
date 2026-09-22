@@ -1,218 +1,47 @@
 {
-  "annotations": {
-    "list": []
-  },
+  "annotations": {"list": []},
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
+  "graphTooltip": 1,
   "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 100,
-      "title": "EdgeDisco Inventory Overview",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "Loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "values": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 1
-      },
-      "id": 1,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.2.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "Loki"
-          },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({service_name=~\".+\"} [$__range]))",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Total EdgeDisco Observations",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "Prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "records/sec",
-            "axisPlacement": "auto",
-            "fillOpacity": 20,
-            "lineWidth": 2
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "values": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 18,
-        "x": 6,
-        "y": 1
-      },
-      "id": 2,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(otelcol_receiver_accepted_log_records[1m])) or sum(rate(otel_receiver_accepted_log_records_total[1m])) or vector(0)",
-          "legendFormat": "Log Ingestion Rate",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "OTel Collector Ingestion Rate",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 5
-      },
-      "id": 101,
-      "title": "Detected AI Assets & Sensors",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "loki",
-        "uid": "Loki"
-      },
-      "gridPos": {
-        "h": 16,
-        "w": 24,
-        "x": 0,
-        "y": 6
-      },
-      "id": 3,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "Loki"
-          },
-          "editorMode": "code",
-          "expr": "{service_name=~\".+\"}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Live EdgeDisco Sensor & Asset Log Stream",
-      "type": "logs"
-    }
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 100, "title": "EdgeDisco Overview", "type": "row"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1}, "id": 1, "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}, "pluginVersion": "10.2.2", "targets": [{"expr": "sum(count_over_time({service_name=~\".+\", event_name=\"edgedisco.asset.observed\"} [$__range]))", "queryType": "range", "refId": "A"}], "title": "Asset State Changes", "type": "stat"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1}, "id": 2, "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}, "targets": [{"expr": "count(sum by (asset_name) (count_over_time({service_name=~\".+\", event_name=\"edgedisco.asset.observed\"} [$__range])))", "queryType": "range", "refId": "A"}], "title": "Unique Assets", "type": "stat"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "orange", "value": null}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1}, "id": 3, "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}, "targets": [{"expr": "count(sum by (device_id) (count_over_time({service_name=~\".+\", event_name=\"edgedisco.device.inventory\"} [$__range])))", "queryType": "range", "refId": "A"}], "title": "Reporting Devices", "type": "stat"},
+    {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []}, "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1}, "id": 4, "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}, "targets": [{"expr": "sum(rate(otelcol_receiver_refused_log_records[5m])) or sum(rate(otelcol_receiver_refused_log_records_total[5m])) or vector(0)", "refId": "A"}], "title": "Refused Logs / sec", "type": "stat"},
+    {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisLabel": "records/sec", "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2, "showPoints": "never", "spanNulls": true}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}, "id": 5, "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}, "targets": [{"expr": "sum(rate(otelcol_receiver_accepted_log_records[1m])) or sum(rate(otelcol_receiver_accepted_log_records_total[1m])) or vector(0)", "legendFormat": "Accepted logs", "refId": "A"}, {"expr": "sum(rate(otelcol_receiver_refused_log_records[1m])) or sum(rate(otelcol_receiver_refused_log_records_total[1m])) or vector(0)", "legendFormat": "Refused logs", "refId": "B"}], "title": "Collector Log Ingestion", "type": "timeseries"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisLabel": "observations", "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1, "stacking": {"group": "A", "mode": "normal"}}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5}, "id": 6, "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}, "targets": [{"expr": "sum by (asset_kind) (count_over_time({service_name=~\".+\", event_name=\"edgedisco.asset.observed\"} [$__interval]))", "legendFormat": "{{asset_kind}}", "queryType": "range", "refId": "A"}], "title": "Asset State Changes by Kind", "type": "timeseries"},
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 13}, "id": 101, "title": "Asset Inventory & Activity", "type": "row"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "fieldConfig": {"defaults": {"mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "gridPos": {"h": 9, "w": 8, "x": 0, "y": 14}, "id": 7, "options": {"legend": {"displayMode": "list", "placement": "right", "showLegend": true}, "pieType": "donut", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}, "tooltip": {"mode": "single", "sort": "desc"}}, "targets": [{"expr": "sum by (asset_kind) (count_over_time({service_name=~\".+\", event_name=\"edgedisco.asset.observed\"} [$__range]))", "legendFormat": "{{asset_kind}}", "queryType": "range", "refId": "A"}], "title": "Assets by Kind", "type": "piechart"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "fieldConfig": {"defaults": {"custom": {"align": "auto", "displayMode": "auto"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "gridPos": {"h": 9, "w": 8, "x": 8, "y": 14}, "id": 8, "options": {"footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true}, "targets": [{"expr": "sum by (asset_vendor) (count_over_time({service_name=~\".+\", event_name=\"edgedisco.asset.observed\"} [$__range]))", "legendFormat": "{{asset_vendor}}", "queryType": "range", "refId": "A", "format": "table"}], "title": "State Changes by Vendor", "type": "table"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisLabel": "state changes", "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "gridPos": {"h": 9, "w": 8, "x": 16, "y": 14}, "id": 9, "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}, "targets": [{"expr": "sum by (asset_running, asset_present) (count_over_time({service_name=~\".+\", event_name=\"edgedisco.asset.observed\"} [$__interval]))", "legendFormat": "present={{asset_present}}, running={{asset_running}}", "queryType": "range", "refId": "A"}], "title": "Asset Presence vs. Running State", "type": "timeseries"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "gridPos": {"h": 12, "w": 24, "x": 0, "y": 23}, "id": 10, "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": true, "sortOrder": "Descending", "wrapLogMessage": true}, "targets": [{"expr": "{service_name=~\".+\", event_name=\"edgedisco.asset.observed\"}", "queryType": "range", "refId": "A"}], "title": "Live Asset State-Change Log Stream", "type": "logs"},
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 35}, "id": 104, "title": "Device Heartbeats & Freshness", "type": "row"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisLabel": "heartbeats", "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 36}, "id": 18, "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}, "targets": [{"expr": "sum by (device_id) (count_over_time({service_name=\"edgedisco\", event_name=\"edgedisco.device.inventory\"} [$__interval]))", "legendFormat": "{{device_id}}", "queryType": "range", "refId": "A"}], "title": "Device Heartbeat Rate", "type": "timeseries"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisLabel": "assets in snapshot", "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 36}, "id": 19, "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}, "targets": [{"expr": "sum by (device_id) (last_over_time({service_name=\"edgedisco\", event_name=\"edgedisco.device.inventory\"} | unwrap inventory_asset_count [$__interval]))", "legendFormat": "{{device_id}}", "queryType": "range", "refId": "A"}], "title": "Assets in Latest Device Snapshot", "type": "timeseries"},
+    {"datasource": {"type": "loki", "uid": "Loki"}, "gridPos": {"h": 8, "w": 24, "x": 0, "y": 44}, "id": 20, "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": true, "sortOrder": "Descending", "wrapLogMessage": true}, "targets": [{"expr": "{service_name=\"edgedisco\", event_name=\"edgedisco.device.inventory\"}", "queryType": "range", "refId": "A"}], "title": "Device Inventory Heartbeats (observation time is freshness evidence)", "type": "logs"},
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 53}, "id": 102, "title": "Collector Health & Throughput", "type": "row"},
+    {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisLabel": "records/sec", "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 0, "y": 54}, "id": 11, "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}, "targets": [{"expr": "sum(rate(otelcol_exporter_sent_log_records[1m])) or sum(rate(otelcol_exporter_sent_log_records_total[1m])) or vector(0)", "legendFormat": "{{exporter}} sent", "refId": "A"}, {"expr": "sum(rate(otelcol_exporter_send_failed_log_records[1m])) or sum(rate(otelcol_exporter_send_failed_log_records_total[1m])) or vector(0)", "legendFormat": "{{exporter}} failed", "refId": "B"}], "title": "Log Export Throughput & Failures", "type": "timeseries"},
+    {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisLabel": "bytes", "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "gridPos": {"h": 8, "w": 12, "x": 12, "y": 54}, "id": 12, "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}, "targets": [{"expr": "otelcol_process_runtime_total_memory_bytes or vector(0)", "legendFormat": "Collector memory", "refId": "A"}, {"expr": "otelcol_process_memory_rss or vector(0)", "legendFormat": "Process RSS", "refId": "B"}], "title": "Collector Memory", "type": "timeseries"},
+    {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.8}, {"color": "red", "value": 0.95}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 6, "x": 0, "y": 62}, "id": 13, "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}, "targets": [{"expr": "sum(rate(otelcol_processor_dropped_log_records[5m])) or sum(rate(otelcol_processor_dropped_log_records_total[5m])) or vector(0)", "refId": "A"}], "title": "Dropped Logs / sec", "type": "stat"},
+    {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 60}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 6, "x": 6, "y": 62}, "id": 14, "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}, "targets": [{"expr": "max(otelcol_process_uptime) or vector(0)", "refId": "A"}], "title": "Collector Uptime", "type": "stat"},
+    {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 6, "x": 12, "y": 62}, "id": 15, "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}, "targets": [{"expr": "sum(otelcol_receiver_accepted_spans) or sum(otelcol_receiver_accepted_spans_total) or vector(0)", "refId": "A"}], "title": "Accepted Traces", "type": "stat"},
+    {"datasource": {"type": "prometheus", "uid": "Prometheus"}, "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []}, "gridPos": {"h": 5, "w": 6, "x": 18, "y": 62}, "id": 16, "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}, "targets": [{"expr": "sum(otelcol_receiver_accepted_metric_points) or sum(otelcol_receiver_accepted_metric_points_total) or vector(0)", "refId": "A"}], "title": "Accepted Metrics", "type": "stat"},
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 68}, "id": 103, "title": "Distributed Traces", "type": "row"},
+    {"datasource": {"type": "tempo", "uid": "Tempo"}, "gridPos": {"h": 12, "w": 24, "x": 0, "y": 69}, "id": 17, "options": {"showTable": true, "showTraceID": true, "spanBar": {"type": "Tag"}}, "targets": [{"queryType": "traceql", "query": "{ resource.service.name = \"edgedisco\" }", "refId": "A"}], "title": "EdgeDisco Traces", "type": "traces"}
   ],
   "refresh": "5s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": [
-    "edgedisco",
-    "otel",
-    "ai-inventory"
-  ],
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
+  "tags": ["edgedisco", "otel", "ai-inventory", "operations"],
+  "time": {"from": "now-1h", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
   "title": "EdgeDisco AI Asset Discovery",
   "uid": "edgedisco-discovery",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

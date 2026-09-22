@@ -32,7 +32,7 @@ Five services wired together on an internal Docker network with published host p
 
 ## Host Port Reservations & Conflicts
 
-To prevent collisions with existing mac-mini services:
+Published services bind to localhost by default. Set \`OTEL_STACK_BIND_ADDRESS\` explicitly only when a protected remote bind is required. To prevent collisions with existing mac-mini services:
 - **Port 3001** is used for Grafana (since Langfuse uses `3000`).
 - **Port 9091** is used for Prometheus (since MinIO uses `9090`).
 - **Port 4317 & 4318** are dedicated to the OTel Collector.
@@ -77,18 +77,19 @@ EdgeDisco emits OTLP Logs to `/v1/logs`.
 - Resource: `service.name: "edgedisco"`, `service.version: "0.5.0"`
 - Scope: `ai_asset_inventory.otlp_encoder (v0.5.0)`
 - Record:
-  - `event_name = "edgedisco.asset.observed"`
+  - `event_name = "edgedisco.asset.observed"` for asset state changes, or `"edgedisco.device.inventory"` for device inventory heartbeats
   - `severity_number = 9` (INFO)
   - `time_unix_nano` = nanoseconds timestamp
   - `body` = empty in native protobuf; synthesized by collector OTTL transform into `edgedisco.asset.observed: <name> (<vendor>) [kind=<kind>]`
 - Attributes preserved in Loki structured metadata:
-  - `edgedisco.schema.version` (int `1`)
+  - `edgedisco.schema.version` (int `2` for current payloads)
   - `edgedisco.observation.id` (`sha256:<64 hex chars>`)
   - `device.id` (`<32 hex chars>`)
   - `asset.kind` (`"application"` | `"process"` | `"agent_runtime"`)
   - `asset.name` (string)
   - `asset.vendor` (string)
   - `asset.running` (bool)
+  - `asset.present` (bool; distinct from running state)
   - `edgedisco.simulated` (bool)
   - `asset.host_app` (optional, e.g. `"Cursor"`, `"Direct/local"`)
   - `asset.relationship` (optional, e.g. `"spawned_by"`, `"local_process"`)
@@ -96,10 +97,13 @@ EdgeDisco emits OTLP Logs to `/v1/logs`.
 ### LogQL Query Syntax
 
 ```logql
-# Stream selector (matches resource service.name)
-{service_name="edgedisco"}
+# Asset state changes only
+{service_name="edgedisco", event_name="edgedisco.asset.observed"}
 
 # Structured metadata pipeline filters (Loki 3.0)
-{service_name="edgedisco"} | asset_name = "Claude Code"
-{service_name="edgedisco"} | asset_vendor = "Anthropic" | asset_running = "true"
+{service_name="edgedisco", event_name="edgedisco.device.inventory"}
+
+# Structured metadata pipeline filters (Loki 3.0)
+{service_name="edgedisco", event_name="edgedisco.asset.observed"} | asset_name = "Claude Code"
+{service_name="edgedisco", event_name="edgedisco.asset.observed"} | asset_vendor = "Anthropic" | asset_present = "true" | asset_running = "true"
 ```

@@ -81,6 +81,9 @@ Open your browser to:
 
 Anonymous admin access is enabled by default. The **EdgeDisco AI Asset Discovery** dashboard is loaded at root.
 
+Published ports bind to \`127.0.0.1\` by default. Set \`OTEL_STACK_BIND_ADDRESS\` explicitly if
+you are placing authenticated TLS ingress in front of the stack for remote access.
+
 ---
 
 ## EdgeDisco Integration Contract
@@ -96,17 +99,18 @@ EdgeDisco's outbox projects asset discoveries using the OTLP Logs specification:
 - **Scope:**
   - `ai_asset_inventory.otlp_encoder (v0.5.0)`
 - **Record Header:**
-  - `event_name = "edgedisco.asset.observed"`
+  - `event_name = "edgedisco.asset.observed"` for asset state changes, or `"edgedisco.device.inventory"` for device inventory heartbeats
   - `severity_number = 9` (INFO)
   - `time_unix_nano` = observation timestamp
 - **Record Attributes:**
-  - `edgedisco.schema.version` (int `1`)
+  - `edgedisco.schema.version` (int `2` for current payloads)
   - `edgedisco.observation.id` (`sha256:<64 hex chars>`)
   - `device.id` (`<32 hex chars>`)
   - `asset.kind` (`"application"` | `"process"` | `"agent_runtime"`)
   - `asset.name` (e.g. `"Claude Code"`, `"Hermes Agent"`, `"Ollama"`, `"CrewAI"`)
   - `asset.vendor` (e.g. `"Anthropic"`, `"Nous Research"`, `"Ollama"`)
   - `asset.running` (boolean `true` | `false`)
+  - `asset.present` (boolean; presence is independent from running state)
   - `edgedisco.simulated` (boolean `true` | `false`)
   - `asset.host_app` (optional, e.g. `"Direct/local"`, `"Cursor"`)
   - `asset.relationship` (optional, e.g. `"local_process"`, `"spawned_by"`)
@@ -129,17 +133,20 @@ All original attributes are preserved and stored in Loki 3.0 as **structured met
 In Loki 3.0, resource attributes (like `service.name`) become stream labels (`service_name`), while log record attributes become structured metadata:
 
 ```logql
-# All EdgeDisco events
-{service_name="edgedisco"}
+# Asset state changes
+{service_name="edgedisco", event_name="edgedisco.asset.observed"}
+
+# Device inventory heartbeats
+{service_name="edgedisco", event_name="edgedisco.device.inventory"}
 
 # Filter by asset name
-{service_name="edgedisco"} | asset_name = "Claude Code"
+{service_name="edgedisco", event_name="edgedisco.asset.observed"} | asset_name = "Claude Code"
 
-# Filter by vendor and running status
-{service_name="edgedisco"} | asset_vendor = "Anthropic" | asset_running = "true"
+# Filter by vendor, presence, and running status
+{service_name="edgedisco", event_name="edgedisco.asset.observed"} | asset_vendor = "Anthropic" | asset_present = "true" | asset_running = "true"
 
 # Aggregate observation rate per asset
-sum by (asset_name) (rate({service_name="edgedisco"} [5m]))
+sum by (asset_name) (rate({service_name="edgedisco", event_name="edgedisco.asset.observed"} [5m]))
 ```
 
 ---
