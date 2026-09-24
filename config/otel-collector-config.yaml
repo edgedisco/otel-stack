@@ -35,9 +35,9 @@ exporters:
     tls:
       insecure: true
 
-  # Prometheus scrape endpoint
+  # Prometheus scrape endpoint for pipeline metrics
   prometheus:
-    endpoint: 0.0.0.0:8889
+    endpoint: 0.0.0.0:8890
     namespace: otel
 
   # Console debug output for live verification of incoming telemetry
@@ -67,4 +67,4 @@ service:
     logs:
       level: info
     metrics:
-      address: 0.0.0.0:8888
+      address: 0.0.0.0:8889
